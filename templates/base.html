@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Безопасные заметки</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <script nonce="{{ nonce }}">
+        // Глобальная конфигурация CSRF
+        window.appConfig = {
+            csrfToken: "{{ csrf_token() }}"
+        };
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Добавляем CSRF токен ко всем формам
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                const csrfInput = form.querySelector('input[name="csrf_token"]');
+                if (!csrfInput && window.appConfig.csrfToken) {
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'csrf_token';
+                    hiddenInput.value = window.appConfig.csrfToken;
+                    form.appendChild(hiddenInput);
+                }
+            });
+
+            // Подтверждение удаления
+            const deleteForms = document.querySelectorAll('form[action*="delete"]');
+            deleteForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    if (!confirm('Вы уверены, что хотите удалить эту заметку?')) {
+                        e.preventDefault();
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="header">
+        <h1>📝 Безопасные заметки</h1>
+        <div class="user-info">
+            {% if user %}
+                👤 {{ user }} | <a href="{{ url_for('logout') }}">Выйти</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Войти</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    {% block content %}{% endblock %}
+</body>
+</html>
