@@ -307,7 +307,11 @@ def internal_error(error):
     return render_template('error.html', error_code=500, error_message='Внутренняя ошибка сервера'), 500
 
 if __name__ == '__main__':
+    import os
     print("🛡️  Запуск ЗАЩИЩЕННОГО приложения")
     print("📍 Адрес: http://127.0.0.1:5000")
     print("👤 Тестовые пользователи: admin/admin123, user1/password1")
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    
+    # Безопасно: debug только из переменных окружения
+    debug_enabled = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug_enabled, host='127.0.0.1', port=5000)
