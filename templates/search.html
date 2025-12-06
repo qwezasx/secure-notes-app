@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>🛡️ Поиск пользователей</h2>
+    <p class="alert info">✅ Защищено от SQL-инъекций</p>
+    
+    <form method="get" action="{{ url_for('search') }}">
+        <div class="form-group">
+            <input type="text" name="q" value="{{ search_term }}" placeholder="Поиск пользователей..." class="form-control">
+        </div>
+        <button type="submit" class="btn btn-primary">Искать</button>
+    </form>
+
+    {% if users %}
+    <div class="search-results mt-4">
+        <h4>Результаты поиска ({{ users|length }}):</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Имя пользователя</th>
+                    <th>Пароль</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for username, password in users %}
+                <tr>
+                    <td>{{ username }}</td>
+                    <td>{{ password }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% elif search_term %}
+    <p class="mt-3">Пользователи не найдены.</p>
+    {% endif %}
+</div>
+{% endblock %}

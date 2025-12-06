@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ошибка {{ error_code }} - Безопасные заметки</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>📝 Безопасные заметки</h1>
+        <div class="user-info">
+            {% if user %}
+                👤 {{ user }} | <a href="{{ url_for('logout') }}">Выйти</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Войти</a>  
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="text-align: center; padding: 50px 20px;">
+        <h1 style="font-size: 48px; color: #dc3545; margin-bottom: 20px;">{{ error_code }}</h1>
+        <h2 style="color: #6c757d; margin-bottom: 30px;">{{ error_message }}</h2>
+        <p style="margin-bottom: 30px; color: #6c757d;">
+            Произошла ошибка. Пожалуйста, попробуйте позже.
+        </p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary" style="text-decoration: none;">
+            ← Вернуться на главную
+        </a>
+    </div>
+</body>
+</html>
