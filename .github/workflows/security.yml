@@ -118,3 +118,68 @@ jobs:
         echo "=== PIPELINE STATUS ==="
         echo "Security scan completed."
         echo "Check the 'Run Bandit and Show Results' step for details."
+
+# ==================== CD: РАЗВЕРТЫВАНИЕ ====================
+  deploy:
+    runs-on: ubuntu-latest
+    needs: security-scan  # Запускаем только если security-scan прошел
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Только при пуше в main
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install gunicorn
+    
+    - name: Create Procfile for Heroku
+      run: |
+        echo "web: gunicorn app:app" > Procfile
+        echo "Python runtime" > runtime.txt
+    
+    - name: Create requirements.txt for production
+      run: |
+        echo "Flask==2.3.3" > requirements_prod.txt
+        echo "Flask-WTF==1.0.1" >> requirements_prod.txt
+        echo "Werkzeug==2.2.3" >> requirements_prod.txt
+        echo "SQLAlchemy==2.0.23" >> requirements_prod.txt
+        echo "Jinja2==3.1.2" >> requirements_prod.txt
+        echo "WTForms==3.0.1" >> requirements_prod.txt
+        echo "bleach==6.0.0" >> requirements_prod.txt
+        echo "python-dotenv==1.0.0" >> requirements_prod.txt
+        echo "gunicorn==21.2.0" >> requirements_prod.txt
+    
+    - name: Create deployment package
+      run: |
+        echo "📦 Creating deployment package..."
+        mkdir -p deploy_package
+        cp -r app.py models.py forms.py requirements_prod.txt Procfile runtime.txt deploy_package/
+        cp -r static templates deploy_package/ 2>/dev/null || true
+        
+        echo "✅ Package created"
+        ls -la deploy_package/
+    
+    - name: Upload deployment artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-package
+        path: deploy_package/
+    
+    - name: Deployment Notification
+      run: |
+        echo "🚀 DEPLOYMENT READY!"
+        echo ""
+        echo "Application can be deployed to:"
+        echo "1. Heroku: heroku create && git push heroku main"
+        echo "2. PythonAnywhere: Upload files via dashboard"
+        echo "3. AWS/Google Cloud: Use deployment package"
+        echo ""
+        echo "✅ CI/CD pipeline completed successfully!"
