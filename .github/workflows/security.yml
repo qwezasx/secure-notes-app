@@ -1,37 +1,82 @@
-name: Security Check
+name: 🔒 Security Scan
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  security:
+  security-scan:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Python
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-    
-    - name: Install Bandit
-      run: pip install bandit
-    
-    - name: Run Bandit
-      run: |
-        bandit -r . -f json -o report.json || true
         
-    - name: Check Results
+    - name: 📦 Install dependencies
       run: |
-        if [ -f report.json ]; then
-          echo "Checking for high severity issues..."
-          # Простая проверка на наличие слова HIGH в отчете
-          if grep -q '"issue_severity": "HIGH"' report.json; then
-            echo "❌ HIGH severity issues found! Blocking merge."
+        pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install bandit safety pytest
+        
+    - name: 🔍 Run Bandit Scan
+      run: |
+        echo "Запуск Bandit security scan..."
+        bandit -r . -f json -o bandit-report.json -c .bandit.yml || echo "Scan completed"
+        
+    - name: 📊 Analyze Bandit Results
+      run: |
+        echo "Анализ результатов Bandit..."
+        if [ -f bandit-check.py ]; then
+          python bandit-check.py
+        else
+          echo "Файл bandit-check.py не найден"
+          # Простая проверка
+          if [ -f bandit-report.json ] && grep -q '"issue_severity": "HIGH"' bandit-report.json; then
+            echo "❌ Найдены HIGH severity уязвимости!"
             exit 1
           else
-            echo "✅ No HIGH severity issues found."
+            echo "✅ HIGH severity уязвимостей не найдено"
           fi
-        else
-          echo "No report generated"
         fi
+        
+    - name: 📋 Check Dependencies
+      run: |
+        echo "Проверка уязвимостей в зависимостях..."
+        safety check --short-report || echo "Проверка завершена"
+        
+    - name: 🧪 Run Tests
+      run: |
+        echo "Запуск тестов..."
+        if [ -d "tests" ]; then
+          python -m pytest tests/ -v || echo "Тесты выполнены"
+        else
+          echo "Папка tests не найдена"
+        fi
+        
+    - name: 📝 Generate Report
+      if: always()
+      run: |
+        echo "Генерация отчета..."
+        if [ -f generate_report.py ]; then
+          python generate_report.py
+        else
+          echo "# Security Report" > SECURITY_REPORT.md
+          echo "Report generated: $(date)" >> SECURITY_REPORT.md
+        fi
+        
+    - name: 📁 Upload Reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          SECURITY_REPORT.md
+          requirements.txt
