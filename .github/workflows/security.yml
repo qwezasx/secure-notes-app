@@ -1,6 +1,10 @@
-name: Security Check
+name: Security Scan
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   security:
@@ -17,22 +21,100 @@ jobs:
     - name: Install Bandit
       run: pip install bandit
     
-    - name: Run Bandit
+    - name: Run Bandit and Show Results
+      id: bandit
       run: |
-        echo "Running Bandit..."
-        bandit -r . -f json -o report.json || true
-    
-    - name: Check Results
-      run: |
-        echo "Checking for high severity issues..."
-        if [ -f report.json ]; then
-          # Простая проверка grep
-          if grep -q '"issue_severity": "HIGH"' report.json; then
-            echo "❌ HIGH severity issues found! Blocking merge."
-            exit 1
-          else
-            echo "✅ No HIGH severity issues found."
-          fi
-        else
-          echo "No report generated"
+        echo "================================================"
+        echo "🔍 STARTING SECURITY SCAN WITH BANDIT"
+        echo "================================================"
+        echo ""
+        
+        # Шаг 1: Запускаем Bandit и показываем результаты сразу
+        echo "📋 RUNNING BANDIT SCAN..."
+        echo "--------------------------------"
+        bandit -r . -f txt -c .bandit.yml || echo "Scan completed"
+        echo ""
+        
+        # Шаг 2: Сохраняем в JSON для проверки
+        echo "💾 SAVING DETAILED REPORT..."
+        bandit -r . -f json -o bandit_report.json -c .bandit.yml 2>/dev/null || true
+        echo ""
+        
+        # Шаг 3: Проверяем результаты (без Python import)
+        echo "📊 ANALYZING RESULTS..."
+        echo "--------------------------------"
+        
+        if [ ! -f "bandit_report.json" ]; then
+          echo "⚠️  No report generated"
+          exit 0
         fi
+        
+        # Используем grep и awk для анализа (без Python)
+        HIGH_COUNT=$(grep -c '"issue_severity": "HIGH"' bandit_report.json)
+        MEDIUM_COUNT=$(grep -c '"issue_severity": "MEDIUM"' bandit_report.json)
+        LOW_COUNT=$(grep -c '"issue_severity": "LOW"' bandit_report.json)
+        
+        echo "📈 SECURITY SCAN SUMMARY:"
+        echo "  🔴 HIGH severity: $HIGH_COUNT"
+        echo "  🟡 MEDIUM severity: $MEDIUM_COUNT"
+        echo "  🟢 LOW severity: $LOW_COUNT"
+        echo ""
+        
+        if [ "$HIGH_COUNT" -gt 0 ]; then
+          echo "❌❌❌ CRITICAL ISSUES FOUND! ❌❌❌"
+          echo ""
+          echo "🔴 HIGH SEVERITY VULNERABILITIES:"
+          echo "--------------------------------"
+          
+          # Извлекаем информацию о HIGH уязвимостях с помощью sed/awk
+          # Берем блоки с HIGH severity
+          grep -A 10 -B 2 '"issue_severity": "HIGH"' bandit_report.json | \
+          while IFS= read -r line; do
+            # Ищем название теста
+            if echo "$line" | grep -q '"test_name"'; then
+              TEST_NAME=$(echo "$line" | sed 's/.*"test_name": "\([^"]*\)".*/\1/')
+              echo "  🚨 $TEST_NAME"
+            fi
+            
+            # Ищем файл и строку
+            if echo "$line" | grep -q '"filename"'; then
+              FILENAME=$(echo "$line" | sed 's/.*"filename": "\([^"]*\)".*/\1/')
+            fi
+            
+            if echo "$line" | grep -q '"line_number"'; then
+              LINE=$(echo "$line" | sed 's/.*"line_number": \([0-9]*\).*/\1/')
+              if [ -n "$FILENAME" ] && [ -n "$LINE" ]; then
+                echo "     📄 File: $FILENAME:$LINE"
+                FILENAME=""
+                LINE=""
+              fi
+            fi
+            
+            # Ищем описание
+            if echo "$line" | grep -q '"issue_text"'; then
+              ISSUE_TEXT=$(echo "$line" | sed 's/.*"issue_text": "\([^"]*\)".*/\1/')
+              echo "     📝 $ISSUE_TEXT"
+              echo ""
+            fi
+          done
+          
+          echo ""
+          echo "================================================"
+          echo "🚫 MERGE BLOCKED: Found $HIGH_COUNT critical vulnerabilities!"
+          echo "================================================"
+          exit 1
+        else
+          echo "✅✅✅ ALL CHECKS PASSED ✅✅✅"
+          echo "No critical vulnerabilities found."
+          echo ""
+          echo "================================================"
+          echo "✅ MERGE APPROVED: Security check passed"
+          echo "================================================"
+        fi
+    
+    - name: Final Status
+      if: always()
+      run: |
+        echo "=== PIPELINE STATUS ==="
+        echo "Security scan completed."
+        echo "Check the 'Run Bandit and Show Results' step for details."
