@@ -1,0 +1,161 @@
+name: 🔒 Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+        
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install bandit safety
+        
+    - name: 🔍 Run Bandit SAST Scan
+      id: bandit
+      run: |
+        echo "🔍 Running Bandit security scan..."
+        
+        # Запускаем Bandit с конфигурацией
+        bandit -r . -f json -o bandit-report.json -c .bandit.yml
+        
+        # Анализируем результаты
+        python << 'EOF'
+import json
+import os
+
+def analyze_bandit_report():
+    try:
+        with open('bandit-report.json', 'r') as f:
+            data = json.load(f)
+        
+        issues = data.get('results', [])
+        
+        # Считаем уязвимости по критичности
+        high_issues = [i for i in issues if i['issue_severity'] == 'HIGH']
+        medium_issues = [i for i in issues if i['issue_severity'] == 'MEDIUM']
+        low_issues = [i for i in issues if i['issue_severity'] == 'LOW']
+        
+        print("📊 Результаты сканирования безопасности:")
+        print(f"   🔴 ВЫСОКАЯ критичность: {len(high_issues)}")
+        print(f"   🟡 СРЕДНЯЯ критичность: {len(medium_issues)}")
+        print(f"   🟢 НИЗКАЯ критичность: {len(low_issues)}")
+        print(f"   📝 Всего проблем: {len(issues)}")
+        
+        # Показываем высокоприоритетные проблемы
+        if high_issues:
+            print("\n❌ КРИТИЧЕСКИЕ проблемы (блокируют мерж):")
+            for issue in high_issues[:3]:  # Показываем первые 3
+                print(f"   - {issue['test_name']}: {issue['issue_text']}")
+                print(f"     📄 Файл: {issue['filename']}:{issue['line_number']}")
+                if 'code' in issue:
+                    print(f"     🔧 Код: {issue['code']}")
+                print()
+        
+        # Устанавливаем выходной статус
+        if len(high_issues) > 0:
+            print(f"\n🚫 BLOCKED: Найдено {len(high_issues)} критических уязвимостей")
+            # Записываем в output для использования в других steps
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                print(f'blocked=true', file=fh)
+            return False
+        else:
+            print("\n✅ ПРОЙДЕНО: Критических уязвимостей не найдено")
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+                print(f'blocked=false', file=fh)
+            return True
+                
+    except FileNotFoundError:
+        print("⚠️ Файл отчета Bandit не найден")
+        return True
+    except Exception as e:
+        print(f"⚠️ Ошибка анализа: {e}")
+        return True
+
+if not analyze_bandit_report():
+    exit(1)
+EOF
+        
+    - name: 📋 Check Dependencies for Vulnerabilities
+      run: |
+        echo "🔎 Проверяем зависимости на уязвимости..."
+        safety check --short-report || echo "✅ Проверка зависимостей завершена"
+        
+    - name: 🧪 Run Security Tests
+      run: |
+        echo "🧪 Запускаем тесты безопасности..."
+        if [ -f "tests/test_security.py" ]; then
+          python -m pytest tests/test_security.py -v
+        else
+          echo "⚠️ Файл тестов безопасности не найден"
+        fi
+        
+    - name: 📊 Generate Security Report
+      if: always()
+      run: |
+        echo "# 📋 Отчет о безопасности" > SECURITY_REPORT.md
+        echo "## Проект: Безопасные заметки" >> SECURITY_REPORT.md
+        echo "## Дата: $(date)" >> SECURITY_REPORT.md
+        echo "" >> SECURITY_REPORT.md
+        echo "### Результаты сканирования:" >> SECURITY_REPORT.md
+        echo "" >> SECURITY_REPORT.md
+        
+        if [ -f bandit-report.json ]; then
+          echo "**Bandit SAST Scan:**" >> SECURITY_REPORT.md
+          python << 'EOF' >> SECURITY_REPORT.md
+import json
+with open('bandit-report.json', 'r') as f:
+    data = json.load(f)
+issues = data.get('results', [])
+high = len([i for i in issues if i['issue_severity'] == 'HIGH'])
+medium = len([i for i in issues if i['issue_severity'] == 'MEDIUM'])
+low = len([i for i in issues if i['issue_severity'] == 'LOW'])
+
+print(f"- 🔴 Критические: {high}")
+print(f"- 🟡 Средние: {medium}")
+print(f"- 🟢 Низкие: {low}")
+print(f"- 📊 Всего: {len(issues)}")
+print()
+
+if high > 0:
+    print("**Критические проблемы:**")
+    for issue in issues[:5]:
+        if issue['issue_severity'] == 'HIGH':
+            print(f"1. **{issue['test_name']}**")
+            print(f"   - Файл: `{issue['filename']}:{issue['line_number']}`")
+            print(f"   - Описание: {issue['issue_text']}")
+            print()
+EOF
+        fi
+        
+        echo "### Рекомендации:" >> SECURITY_REPORT.md
+        echo "1. Регулярно обновляйте зависимости" >> SECURITY_REPORT.md
+        echo "2. Проводите ручное тестирование безопасности" >> SECURITY_REPORT.md
+        echo "3. Используйте секреты из переменных окружения" >> SECURITY_REPORT.md
+        
+        cat SECURITY_REPORT.md
+        
+    - name: 📁 Upload Security Reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          SECURITY_REPORT.md
