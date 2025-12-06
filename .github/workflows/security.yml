@@ -7,12 +7,12 @@ on:
     branches: [main]
 
 jobs:
-  # ============ CI: Security Check ============
   security:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
     
     - name: Setup Python
       uses: actions/setup-python@v4
@@ -23,128 +23,51 @@ jobs:
       run: pip install bandit
     
     - name: Run Security Scan
-      id: security-scan
       run: |
-        echo "================================================"
-        echo "🔍 SECURITY SCAN STARTED"
-        echo "================================================"
-        
-        # Запускаем Bandit и показываем вывод
-        echo ""
-        echo "📋 RUNNING BANDIT..."
+        echo "Running security scan..."
         bandit -r . -c .bandit.yml
+        echo "Security scan completed"
+    
+    - name: Check Results
+      run: |
+        echo "Checking for issues..."
+        bandit -r . -f json -o report.json -c .bandit.yml 2>/dev/null || true
         
-        echo ""
-        echo "💾 CREATING REPORT..."
-        bandit -r . -f json -o report.json -c .bandit.yml 2>/dev/null || echo "Report created"
-        
-        echo ""
-        echo "📊 ANALYZING..."
-        
-        # Проверяем существует ли файл
-        if [ ! -f "report.json" ]; then
-          echo "✅ No report - assuming no issues"
-          exit 0
-        fi
-        
-        # Смотрим что в файле (для отладки)
-        echo "Report size: $(wc -l < report.json) lines"
-        
-        # ПРОВЕРКА: ищем именно "HIGH" в нужном поле
-        # grep должен искать: "issue_severity": "HIGH"
-        if grep -q '"issue_severity": "HIGH"' report.json; then
-          echo "❌ FOUND HIGH SEVERITY ISSUES"
-          HIGH_COUNT=$(grep -c '"issue_severity": "HIGH"' report.json)
-          echo "Count: $HIGH_COUNT"
-          exit 1
+        if [ -f report.json ]; then
+          echo "Checking report..."
+          # Простая проверка без сложного grep
+          if grep -q '"issue_severity": "HIGH"' report.json; then
+            echo "Found HIGH severity issues"
+            exit 1
+          else
+            echo "No HIGH severity issues found"
+          fi
         else
-          echo "✅ NO HIGH SEVERITY ISSUES FOUND"
-          echo "🎉 SECURITY SCAN PASSED"
-          exit 0
+          echo "No report file"
         fi
   
-  # ============ CD: Deployment ============
   deploy:
     runs-on: ubuntu-latest
-    needs: security  # Требуем успешного security scan
+    needs: security
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
-    - name: Deployment Setup
+    - name: Deploy Preparation
       run: |
-        echo "🚀 DEPLOYMENT STARTED"
-        echo "====================="
-        echo ""
-        echo "CI Status: ✅ SECURITY CHECKS PASSED"
-        echo "Application: Secure Notes App"
-        echo ""
+        echo "Deployment started"
+        echo "Security checks passed"
+        echo "Creating deployment package..."
         
-        # Создаем манифест
-        echo '{
-  "app": "Secure Notes App",
-  "status": "ready",
-  "security": "passed",
-  "date": "'"$(date)"'"
-}' > manifest.json
-        
-        echo "📄 Manifest created"
-    
-    - name: Create Deployment Package
-      run: |
-        echo "📦 CREATING PACKAGE"
-        echo "==================="
-        
-        # Создаем папку
         mkdir -p deploy
+        echo "app.py" > deploy/files.txt
+        echo "models.py" >> deploy/files.txt
+        echo "forms.py" >> deploy/files.txt
+        echo "requirements.txt" >> deploy/files.txt
         
-        # Копируем файлы
-        cp app.py models.py forms.py requirements.txt deploy/
-        
-        # Проверяем и копируем остальные
-        [ -d "static" ] && cp -r static deploy/
-        [ -d "templates" ] && cp -r templates deploy/
-        
-        # Создаем README
-        echo "# 🚀 Deployment Ready
-
-✅ Security check: PASSED
-✅ Code quality: READY
-✅ Package: PREPARED
-
-## Quick Deploy:
-\`\`\`bash
-pip install -r requirements.txt
-python app.py
-\`\`\`
-
-## Production:
-\`\`\`bash
-pip install gunicorn
-gunicorn app:app
-\`\`\`
-
----" > deploy/README.md
-        
-        echo "📁 Package created"
-        ls -la deploy/
+        echo "Package created"
     
-    - name: Upload Artifact
+    - name: Upload Package
       uses: actions/upload-artifact@v4
       with:
-        name: app-deployment
+        name: deployment
         path: deploy/
-    
-    - name: Final Message
-      run: |
-        echo ""
-        echo "🎉 CI/CD COMPLETE!"
-        echo "=================="
-        echo ""
-        echo "✅ Security: PASSED"
-        echo "✅ Deployment: READY"
-        echo "📦 Artifact: 'app-deployment'"
-        echo ""
-        echo "🚀 Ready for production!"
