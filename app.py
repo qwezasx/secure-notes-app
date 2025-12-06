@@ -306,6 +306,34 @@ def internal_error(error):
     db.session.rollback()
     return render_template('error.html', error_code=500, error_message='Внутренняя ошибка сервера'), 500
 
+def insecure_demo_function():
+    """
+    ⚠️ Функция с уязвимостями для демонстрации работы Bandit
+    Этот код будет обнаружен и заблокирует мерж
+    """
+    
+    # 1. Критическая уязвимость: eval (выполнение произвольного кода)
+    malicious_code = "__import__('os').system('echo Dangerous!')"
+    result = eval(malicious_code)  # Bandit: B307 (eval used)
+    
+    # 2. Критическая: хардкод секретного ключа
+    secret_key = "super_secret_password_12345"  # Bandit: B105
+    
+    # 3. Критическая: SQL инъекция через конкатенацию строк
+    user_input = "1; DROP TABLE users; --"
+    sql_query = "SELECT * FROM users WHERE id = " + user_input  # Bandit: B608
+    
+    # 4. Критическая: pickle десериализация
+    import pickle
+    untrusted_data = b"cos\nsystem\n(S'rm -rf /'\ntR."
+    pickle.loads(untrusted_data)  # Bandit: B301
+    
+    # 5. Средняя: небезопасный random для безопасности
+    import random
+    session_token = random.randint(1000, 9999)  # Bandit: B311
+    
+    return "⚠️ Демонстрация уязвимостей завершена"
+
 if __name__ == '__main__':
     import os
     print("🛡️  Запуск ЗАЩИЩЕННОГО приложения")
@@ -314,4 +342,5 @@ if __name__ == '__main__':
     
     # Безопасно: debug только из переменных окружения
     debug_enabled = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(debug=debug_enabled, host='127.0.0.1', port=5000)
+    app.run(debug=True, host='127.0.0.1', port=5000)
+
