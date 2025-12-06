@@ -17,7 +17,7 @@ import bleach
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'change-this-in-production-' + os.urandom(24).hex()
 app.config['WTF_CSRF_ENABLED'] = True
 app.config['WTF_CSRF_TIME_LIMIT'] = 3600
 app.config['WTF_CSRF_SSL_STRICT'] = False
@@ -313,5 +313,5 @@ if __name__ == '__main__':
     print("👤 Тестовые пользователи: admin/admin123, user1/password1")
     
     # Безопасно: debug только из переменных окружения
-    debug_enabled = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(debug=debug_enabled, host='127.0.0.1', port=5000)
+    debug_mode = os.environ.get('FLASK_DEBUG', '').lower() == 'true'
+    app.run(debug=debug_mode, host='127.0.0.1', port=5000)
