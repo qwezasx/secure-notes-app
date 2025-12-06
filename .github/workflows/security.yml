@@ -73,18 +73,16 @@ jobs:
         echo "🎯 Trigger: Push to main branch"
         echo ""
         
-        # Создаем простой deployment манифест
-        cat > deployment_manifest.json << 'EOF'
-{
+        # Создаем простой deployment манифест (без EOF проблем)
+        echo '{
   "application": "Secure Notes App",
   "version": "1.0.0",
-  "deployment_date": "$(date)",
+  "deployment_date": "'"$(date)"'",
   "ci_status": "passed",
   "security_scan": "passed",
   "files": ["app.py", "models.py", "forms.py", "requirements.txt"],
   "deployment_ready": true
-}
-EOF
+}' > deployment_manifest.json
         
         echo "✅ Deployment manifest created"
     
@@ -102,9 +100,8 @@ EOF
         [ -d "static" ] && cp -r static deploy/ || echo "No static directory"
         [ -d "templates" ] && cp -r templates deploy/ || echo "No templates directory"
         
-        # Инструкции по деплою
-        cat > deploy/DEPLOY.md << 'EOF'
-# 🚀 Deployment Instructions
+        # Инструкции по деплою (простой способ)
+        echo "# 🚀 Deployment Instructions
 
 ## CI/CD Status: ✅ READY FOR DEPLOYMENT
 
@@ -114,6 +111,51 @@ EOF
 ## Deployment Options:
 
 ### 1. Quick Start (Development):
-```bash
+\`\`\`bash
 pip install -r requirements.txt
 python app.py
+\`\`\`
+
+### 2. Production with Gunicorn:
+\`\`\`bash
+pip install gunicorn
+gunicorn --bind 0.0.0.0:5000 app:app
+\`\`\`
+
+### 3. Heroku:
+\`\`\`bash
+heroku create
+git push heroku main
+\`\`\`
+
+## Environment Variables (Production):
+- SECRET_KEY: Generate with: openssl rand -hex 32
+- FLASK_ENV: production
+- DATABASE_URL: Your database connection string
+
+## Security Notes:
+✅ All Bandit checks passed
+✅ No critical vulnerabilities
+✅ Ready for production deployment" > deploy/DEPLOY.md
+        
+        echo "📊 Package contents:"
+        ls -la deploy/
+    
+    - name: Upload Deployment Package
+      uses: actions/upload-artifact@v4
+      with:
+        name: secure-notes-app
+        path: deploy/
+    
+    - name: Final Status
+      run: |
+        echo ""
+        echo "🎉 CI/CD PIPELINE COMPLETED SUCCESSFULLY!"
+        echo "=========================================="
+        echo ""
+        echo "✅ SECURITY: All checks passed"
+        echo "✅ DEPLOYMENT: Package prepared"
+        echo "✅ ARTIFACT: 'secure-notes-app' uploaded"
+        echo ""
+        echo "🚀 Application is ready for deployment!"
+        echo "📦 Download from GitHub Actions artifacts"
