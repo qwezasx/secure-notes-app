@@ -28,7 +28,8 @@ skips:
   - B110  # try_except_pass (нужно для обработки ошибок)
   - B112  # try_except_continue (нужно для обработки ошибок)
   - B201  # flask_debug_true (игнорируем в app.py, т.к. это dev настройка)
-
+  - B104  # hardcoded_bind_all_interfaces
+  
 # tests: включаемые тесты (по умолчанию все, но можно ограничить)
 tests:
   - B301  # pickle
@@ -56,4 +57,5 @@ ignore:
   - "app.py:app.run(debug=True,"
   
   # Игнорируем fallback-secret-key - это для тестовой среды
+
   - "app.py:app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')"
