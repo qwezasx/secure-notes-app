@@ -306,8 +306,29 @@ def internal_error(error):
     db.session.rollback()
     return render_template('error.html', error_code=500, error_message='Внутренняя ошибка сервера'), 500
 
+def insecure_demo():
+    """Функция с уязвимостями для демонстрации работы Bandit"""
+    
+    # 1. Критическая: eval с пользовательским вводом
+    user_code = "__import__('os').system('rm -rf /')"
+    result = eval(user_code)  # Bandit: B307 (eval)
+    
+    # 2. Критическая: хардкод секрета
+    secret = "my_super_secret_key_12345"  # Bandit: B105
+    
+    # 3. Критическая: SQL инъекция
+    user_input = "1; DROP TABLE users; --"
+    query = f"SELECT * FROM users WHERE id = {user_input}"  # Bandit: B608
+    
+    # 4. Средняя: pickle десериализация
+    import pickle
+    data = pickle.loads(b"data")  # Bandit: B301
+    
+    return "Демо уязвимостей"
+
 if __name__ == '__main__':
     print("🛡️  Запуск ЗАЩИЩЕННОГО приложения")
     print("📍 Адрес: http://127.0.0.1:5000")
     print("👤 Тестовые пользователи: admin/admin123, user1/password1")
+
     app.run(debug=True, host='127.0.0.1', port=5000)
